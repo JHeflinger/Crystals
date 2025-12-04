@@ -1,0 +1,19 @@
+General format:
+newmtl <name>                      // defines the name of a material
+convert <start> <end> <values ...> // from wavelengths ranging from start to end, each wavelength will convert to the specified value
+diffuse <start> <end> <values ...> // (RAYTRACING ONLY) transforms diffuse values
+specular <start> <end> <values ...> // (RAYTRACING ONLY) transforms specular values
+ambient <start> <end> <values ...> // the default ambient color of the material (RECOMMENDED to be ZERO)
+absorb <start> <end> <values ...> // from wavelengths ranging from start to end, specifies the % each wavelength should return when light hits this material
+ior <start> <end> <values ...> // from wavelengths ranging from start to end, specifies the index of refraction for each wavelength
+transmission <start> <end> <values ...> // from wavelengths ranging from start to end, specifies the transmission (how much energy for every unit of 1.0 when traveling through a volume)
+shiny <value> // (RAYTRACING ONLY) specular shiny
+type <dielectric/lambertian> // specifies either lambertian or dielectric, lambertians are diffuse surfaces and dielectrics are transmissive/reflective surfaces
+diffract <true/false> // specifies if it should diffract or not
+
+
+General notes:
+1. If <start> and <end> are both 0, the transform will default to y=x, or in other words any input's output will just be the input. If both are 0, then you do not need to specify values
+2. You do not have to specify a value for every single wavelength, the parser will interpolate the fourier transform for missing values. They will, however, be uniformly scattered across the range.
+3. The spectral renderer is configured from range 100nm to 700nm wavelengths. Please try to use that range when defining material properties. Note that ~400-700nm is the spectrum of VISIBLE light (100-300 is ultraviolet, so useful for fluorescent materials)
+4. Material properties do not all have to be defined, if you do not define them they will default to some other value
