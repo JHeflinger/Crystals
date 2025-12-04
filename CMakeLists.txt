@@ -9,8 +9,6 @@ endif()
 set(EXECUTABLE_NAME "spectrum")
 project(${EXECUTABLE_NAME})
 
-find_package(Vulkan REQUIRED)
-
 add_definitions ( -DEXEC_NAME="${EXECUTABLE_NAME}" )
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 
@@ -31,6 +29,6 @@ if(UNIX AND NOT APPLE)
     set(LIBS ${LIBS} ${CMAKE_DL_LIBS})
 endif()
 
-target_link_libraries(${EXECUTABLE_NAME} PRIVATE Vulkan::Vulkan ${LIBS})
+target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${LIBS})
 
 
