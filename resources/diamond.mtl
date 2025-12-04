@@ -1,0 +1,41 @@
+newmtl diamond
+convert 0 0
+diffuse 0 0
+specular 0 0
+ambient 400 700 0
+absorb 400 700 0.875 0.99 0.99 0.98 0.875 0.875
+ior 100 700 1.53 1.52 1.5 1.491 1.475 1.45 1.42 1.41 1.389 1.3504
+transmission 100 700 1.0
+shiny 25.0
+type dielectric
+diffract true
+
+newmtl matte
+convert 0 0
+diffuse 0 0
+specular 0 0
+ambient 400 700 0
+absorb 100 700 1.0 1.0 1.0 1.0 0.9 0.8 0.7
+ior 400 700 0
+shiny 25.0
+type lambertian
+
+newmtl glow
+convert 100 700 520 500 271 357 442 528 614
+diffuse 0 0
+specular 0 0
+ambient 100 700 0
+absorb 100 700 1.0 1.0 1.0 0.98 0.775 0.675
+ior 100 700 2.491 2.375 2.25 2.12 2.01 1.989 1.8504
+shiny 25.0
+type lambertian
+diffract false
+
+newmtl sun
+emission 100 700 0.2
+
+newmtl ceiling
+emission 100 700 0.01
+
+newmtl blacklight
+emission 100 700 0.6 0.3 0.15 0.075 0.0325 0.01625 0.008135

@@ -1,0 +1,8 @@
+newmtl orange
+convert 0 0
+diffuse 0 0
+specular 0 0
+ambient 400 700 0
+absorb 400 700 0.01875 0.0099 0.0099 0.0098 0.00875 0.00875
+shiny 25.0
+type lambertian

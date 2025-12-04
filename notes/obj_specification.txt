@@ -1,0 +1,22 @@
+Vertex:
+    - Usage: v <x> <y> <z>
+    - Description: Specifies a vertex position
+
+Non-geometry vertex:
+    - Usage: ng <x> <y> <z>
+    - Description: Specifies a vector value not used for vertex geometry
+
+Face:
+    - Usage: f <v1> <v2> <v3>
+    - Description: Specifies a face
+
+Camera:
+    - Usage: camera <position v> <look ng> <up ng> <hangle>
+    - Description: Specifies the camera
+
+Sphere:
+    - Usage: sphere <position v> <radius>
+    - Description: Specifies a sphere
+
+Directional light:
+    - Usage: ld <direction ng> <color wavelength start> <color wavelength end> <function points>

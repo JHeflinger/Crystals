@@ -1,0 +1,22 @@
+mtllib sphere.mtl
+
+# vertices
+v 1.5 1.5 1.5
+v 0.0 0.0 0.0
+
+# non-geometric vertices
+ng 0.0 1.0 0.0
+ng 1.0 1.0 1.0
+ng -3.0 -2.0 -1.0
+ng 0.0 0.0 0.0
+
+# lights
+# ld 3 100 700 0.006 0.003 0.0015 0.00075 0.000325 0.0001625 0.00008135
+ld 3 100 700 1.0
+
+# camera
+camera 1 4 1 30.0
+
+usemtl orange
+
+sphere 2 0.8

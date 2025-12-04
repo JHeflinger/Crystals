@@ -1,0 +1,8 @@
+./build.sh
+if [ $? -ne 0 ]; then
+	exit 1
+fi
+./build/build/spectrum $1
+if [ -f "out.png" ]; then
+	feh --auto-zoom out.png
+fi
