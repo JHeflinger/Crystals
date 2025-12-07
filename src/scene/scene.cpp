@@ -6,6 +6,7 @@
 #include "util/jlm.h"
 #include "util/halton.h"
 #include "renderer/config.h"
+#include <iostream>
 
 #define EPSILON 0.0001f
 
@@ -15,14 +16,14 @@ Spectrum Scene::shade(int x, int y) {
     std::vector<glm::vec2> offsets = Halton::generate(GlobalConfig::pathSamples(), x, y);
     for (int i = 0; i < count; i++) {
         Ray ray = camera.generateRay(x, y, offsets[i].x, offsets[i].y);
-        s += shade(ray, (Medium){ 1.0f, 0, MaterialUtils::AirMaterial(), Spectrum(1.0f), NMSAMPLES, ray.p});
+        s += shade(ray, (Medium){ 1.0f, 0, MaterialUtils::AirMaterial(), Spectrum(1.0f), NMSAMPLES, ray.p}, true);
     }
     return s / float(count);
 }
 
-Spectrum Scene::shade(const Ray& ray, const Medium& medium) {
+Spectrum Scene::shade(const Ray& ray, const Medium& medium, bool area) {
     Hit h = intersect(ray);
-    if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium) : rayColor(h, medium));
+    if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium, area) : rayColor(h, medium));
 	else if (GlobalConfig::pathtrace() && medium.material != MaterialUtils::AirMaterial()) {
 		// DIRECT LIGHTING ON MISS
 		Hit h2{};
@@ -76,16 +77,54 @@ Hit Scene::traverse(const Ray& ray, size_t ind) const {
     return h;
 }
 
+std::pair<float, float> getRandomPoint(std::uniform_real_distribution<> &dis, std::mt19937 &gen) {
+    return {(static_cast<float>(dis(gen))), (static_cast<float>(dis(gen)))};
+}
+
+std::vector<vertex> sampleAreaLights(const Light& light, int samples, std::uniform_real_distribution<> &dis, std::mt19937 &gen) {
+    glm::vec3 pos = light.position;
+    std::vector<glm::vec3> positions;
+    int n = std::sqrt(samples);
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            auto p = getRandomPoint(dis, gen);
+            float u = (i + p.first) / n;
+            float v = (j + p.second) / n;
+            positions.push_back(pos + u * vertex(light.wvec) + v * vertex(light.hvec));
+        }
+    }
+    return positions;
+}
+
 Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
     Material* m = hit.material < 0 ? MaterialUtils::DefaultMaterial() : &(materials[hit.material]);
 
     // DIRECT LIGHTING
     Spectrum s = m->ambient().spectrum();
     for (int i = 0; i < lights.size(); i++) {
-        DirectLightData dld = SceneUtils::directLight(lights[i], hit, *m);
-        if (intersect((Ray){ hit.p + dld.d2l*EPSILON, dld.d2l }).t <= 0.0f) {
-            s += (Spectrum(m->absorb()) * dld.color * (m->diffuse().evaluate(dld.diffuse) + m->specular().evaluate(dld.specular)));
+        if (glm::length(lights[i].hvec) != 0.0f) {
+            auto lightPositions = sampleAreaLights(lights[i], 100, dis, gen);
+            Spectrum aggregate(0.0);
+            for (const auto &p : lightPositions) {
+                Light sampleLight = lights[i];
+                sampleLight.position = p;
+                DirectLightData dld = SceneUtils::directLight(sampleLight, hit, *m);
+                auto t = intersect({ hit.p + dld.d2l * EPSILON, dld.d2l }).t;
+                if (t <= 0.0f || t > hit.t) {
+                    aggregate += Spectrum(m->absorb()) *
+                        dld.color *
+                           (m->diffuse().evaluate(dld.diffuse) +
+                            m->specular().evaluate(dld.specular));
+                }
+            }
+            s += aggregate / lightPositions.size();
+        } else {
+            DirectLightData dld = SceneUtils::directLight(lights[i], hit, *m);
+            if (intersect((Ray){ hit.p + dld.d2l*EPSILON, dld.d2l }).t <= 0.0f) {
+                s += (Spectrum(m->absorb()) * dld.color * (m->diffuse().evaluate(dld.diffuse) + m->specular().evaluate(dld.specular)));
+            }
         }
+        
     }
 
 	// UPDATE THROUGHPUT
@@ -100,7 +139,7 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
             split[i] = Optics::DielectricFresnel(hit.d2c, hit.n, medium.ior, m->ior().evaluate(Spectrum::wavelength(i)));
         }
         glm::vec3 reflect_dir = glm::normalize(jlm::reflect(hit.d2c, hit.n));
-        Spectrum reflected = shade((Ray){ hit.p + reflect_dir*EPSILON, reflect_dir }, (Medium){ medium.ior, newbounces, m, newT, medium.wavelength, hit.p }) * split;
+        Spectrum reflected = shade((Ray){ hit.p + reflect_dir*EPSILON, reflect_dir }, (Medium){ medium.ior, newbounces, m, newT, medium.wavelength, hit.p }, false) * split;
         Spectrum refracted = Spectrum(0.0f);
         for (int i = 0; i < NMSAMPLES; i++) {
 			if (medium.wavelength < NMSAMPLES) i = medium.wavelength;
@@ -108,7 +147,7 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
             float ior = newm->ior().evaluate(Spectrum::wavelength(i));
             if (ior > 0.0f) {
                 glm::vec3 refract_dir = glm::normalize(glm::refract(hit.d2c, hit.n, medium.ior / ior));
-                refracted[i] += shade((Ray){ hit.p + refract_dir*EPSILON, refract_dir }, (Medium){ ior, newbounces, newm, newT, i, hit.p })[i] * (1.0f - split[i]);
+                refracted[i] += shade((Ray){ hit.p + refract_dir*EPSILON, refract_dir }, (Medium){ ior, newbounces, newm, newT, i, hit.p }, false)[i] * (1.0f - split[i]);
             }
 			if (medium.wavelength < NMSAMPLES) break;
         }
@@ -121,14 +160,43 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
     return s*medium.throughput;
 }
 
-Spectrum Scene::pathColor(const Hit& hit, const Medium& medium) {
+
+
+
+Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, bool area) {
     Material* m = hit.material < 0 ? MaterialUtils::DefaultMaterial() : &(materials[hit.material]);
+
+
 
 	// EMISSION
 	if (m->emissive()) return medium.throughput * m->emission();
 
 	// PATH
     Spectrum s = Spectrum(0.0f);
+    for (auto light : lights) {
+        if (!area) break;
+        // assuming area lights
+        float u = dis(gen);
+        float v = dis(gen);
+        auto lightPositions = sampleAreaLights(light, 25, dis, gen);
+        for (const auto point : lightPositions) {
+            glm::vec3 direction = point - hit.p;
+            glm::vec3 dirNorm = glm::normalize(direction);
+            float dist = glm::length(direction);
+            glm::vec3 lightNormal = glm::normalize(glm::cross(light.wvec, light.hvec));
+            float cosLight = glm::dot(-dirNorm, lightNormal);
+            if (cosLight <= 0.0f) {
+                continue;
+            }
+            float t = intersect({ hit.p + dirNorm * EPSILON, dirNorm}).t;
+            if (t >= 0.0 && t < hit.t) continue;
+            float area = glm::length(glm::cross(light.wvec, light.hvec));
+            float cosTheta = std::max(0.0f, glm::dot(hit.n, dirNorm));
+            Spectrum diffuse = Spectrum(light.color) * m->diffuse().evaluate(cosTheta) / M_PI;
+            float factor = area / (dist * dist);
+            s += diffuse * cosLight * factor * medium.throughput / lightPositions.size();
+        }
+    }
 	std::vector<Sample> samples = m->sample(hit, medium);
 	for (int i = 0; i < samples.size(); i++) {
 		if (samples[i].pdf > 0 && medium.bounces < GlobalConfig::maxDepth()) {
@@ -144,7 +212,7 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium) {
 			} 
 			if (recurse) s += shade(
 					(Ray){ hit.p + samples[i].incoming*EPSILON, samples[i].incoming },
-					(Medium){ samples[i].ior, medium.bounces + 1, m, newT, samples[i].wavelength, hit.p });
+					(Medium){ samples[i].ior, medium.bounces + 1, m, newT, samples[i].wavelength, hit.p }, false);
 		}
 	}
 
@@ -158,14 +226,14 @@ DirectLightData SceneUtils::directLight(const Light& light, const Hit& hit, cons
     DirectLightData dld{};
     dld.color = Spectrum(light.color);
     glm::vec3 ld = glm::vec3(0.0f);
-    if (light.direction.length() == 0.0f) { // point light
-        dld.d2l = glm::normalize(hit.p - light.position);
-        ERROR("Not implemented yet!");
+    if (glm::length(light.direction) == 0.0f) { // point light
+        dld.d2l = glm::normalize(light.position - hit.p);
+        ld = dld.d2l;
     } else if (light.penumbra == 0 && light.angle == 0) { // directional light
-        dld.d2l = light.direction;
-        ld = light.direction;
+        dld.d2l = glm::normalize(light.direction);
+        ld = dld.d2l;
     } else { // spot light
-        dld.d2l = glm::normalize(hit.p - light.position);
+        dld.d2l = glm::normalize(light.position - hit.p);
         ERROR("Not implemented yet!");
     }
     dld.diffuse = std::max(0.0f, glm::dot(hit.n, ld));

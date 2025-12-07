@@ -11,6 +11,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <unordered_map>
+#include <random>
 
 typedef glm::vec3 vertex;
 typedef glm::vec3 nongeo;
@@ -22,6 +23,8 @@ struct Light {
     glm::vec3 direction;
     float penumbra;
     float angle;
+    glm::vec3 hvec;
+    glm::vec3 wvec;
 };
 
 struct DirectLightData {
@@ -52,14 +55,17 @@ struct Scene {
     std::vector<NodeBVH> bvh;
 	std::vector<Material> materials;
 	std::unordered_map<std::string, int> matmap;
+    std::mt19937 gen;
+    std::uniform_real_distribution<> dis;
     Spectrum shade(int x, int y);
-    Spectrum shade(const Ray& ray, const Medium& medium);
+    Spectrum shade(const Ray& ray, const Medium& medium, bool area);
 	void pollMetadata(const Ray& ray, glm::vec3& n, glm::vec3& p, glm::vec3& a) const;
 private:
     Hit intersect(const Ray& ray) const;
     Hit traverse(const Ray& ray, size_t ind) const;
     Spectrum rayColor(const Hit& hit, const Medium& medium);
-	Spectrum pathColor(const Hit& hit, const Medium& medium);
+	Spectrum pathColor(const Hit& hit, const Medium& medium, bool area);
+    bool sampleAreaLight(const Light& light, const Hit& hit);
 };
 
 namespace SceneUtils {

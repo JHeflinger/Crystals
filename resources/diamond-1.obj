@@ -831,6 +831,12 @@ usemtl ceiling
 
 f 297 298 299 300
 
-usemtl sun
+usemtl matte
 
 sphere 292 0.2
+
+
+# Area light centered at vertex 300
+v 6.7 0 2
+
+la 301 400 700   0 5 0   0 0 3   0.01 0.0066666 0.033333
