@@ -174,12 +174,7 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, bool area) {
 	// PATH
     Spectrum s = Spectrum(0.0f);
     int samp = 25;
-    bool speed = false;
     for (auto light : lights) {
-        if (!area)  {
-            if (speed) break;
-            samp = 4;
-        }
         // assuming area lights
         float u = dis(gen);
         float v = dis(gen);
