@@ -69,6 +69,7 @@ bool parseNonGeometric(std::vector<std::string> args, Scene& scene) {
 }
 
 bool parseAreaLight(std::vector<std::string> args, Scene& scene) {
+    // ___, vindex, f1, f2, wx, wy, wz, hx, hy, hz, f stucc
     if (args.size() < 10) return false;
     int i1;
     float f1, f2;
