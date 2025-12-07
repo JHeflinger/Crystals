@@ -173,12 +173,17 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, bool area) {
 
 	// PATH
     Spectrum s = Spectrum(0.0f);
+    int samp = 25;
+    bool speed = false;
     for (auto light : lights) {
-        if (!area) break;
+        if (!area)  {
+            if (speed) break;
+            samp = 4;
+        }
         // assuming area lights
         float u = dis(gen);
         float v = dis(gen);
-        auto lightPositions = sampleAreaLights(light, 25, dis, gen);
+        auto lightPositions = sampleAreaLights(light, samp, dis, gen);
         for (const auto point : lightPositions) {
             glm::vec3 direction = point - hit.p;
             glm::vec3 dirNorm = glm::normalize(direction);
