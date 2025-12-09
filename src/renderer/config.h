@@ -2,7 +2,7 @@
 
 struct Config {
 	int mindepth = 3;
-	int maxdepth = 400;
+	int maxdepth = 1000;
 	int pathsamples = 8;
 	bool pathtrace = true;
 	bool denoise = true;
