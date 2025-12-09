@@ -1,0 +1,45 @@
+newmtl rock
+convert 0 0
+diffuse 0 0
+specular 0 0
+ambient 400 700 0
+absorb 400 700 0.15 0.14 0.13 0.12 0.11 0.10
+shiny 8.0
+type lambertian
+diffract false
+
+newmtl crystal_blue
+convert 0 0
+diffuse 0 0
+specular 0 0
+ambient 400 700 0
+absorb 400 700 0.95 0.90 0.65 0.35 0.15 0.10
+ior 100 700 1.53 1.52 1.50 1.491 1.475 1.45 1.42 1.41 1.389 1.3504
+transmission 100 700 1.0
+shiny 25.0
+type dielectric
+diffract true
+
+newmtl crystal_purple
+convert 0 0
+diffuse 0 0
+specular 0 0
+ambient 400 700 0
+absorb 400 700 0.90 0.70 0.40 0.40 0.70 0.90
+ior 100 700 1.53 1.52 1.50 1.491 1.475 1.45 1.42 1.41 1.389 1.3504
+transmission 100 700 1.0
+shiny 25.0
+type dielectric
+diffract true
+
+newmtl crystal_red
+convert 0 0
+diffuse 0 0
+specular 0 0
+ambient 400 700 0
+absorb 400 700 0.10 0.15 0.35 0.65 0.90 0.95
+ior 100 700 1.53 1.52 1.50 1.491 1.475 1.45 1.42 1.41 1.389 1.3504
+transmission 100 700 1.0
+shiny 25.0
+type dielectric
+diffract true

@@ -4,5 +4,5 @@ if [ $? -ne 0 ]; then
 fi
 ./build/build/spectrum $1 $2 $3 $4 $5 $6
 if [ -f "out.png" ]; then
-    feh --auto-zoom out.png
+    open out.png
 fi

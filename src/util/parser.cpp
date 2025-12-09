@@ -3,7 +3,6 @@
 #include "util/jlm.h"
 #include <fstream>
 #include <sstream>
-#include <filesystem>
 
 std::vector<std::string> lineargs(std::string line) {
     std::vector<std::string> result;
@@ -41,7 +40,7 @@ Fourier parseFourier(std::vector<std::string> args, int start, int end) {
 	for (int i = 0; i < args.size(); i++) {
 		float f;
 		if (!parseFloat(args[i], f)) {
-			WARN("Invalid float detected: \"%s\"", args[i]);
+            WARN("Invalid float detected: \"%s\"", args[i].c_str());
 			continue;
 		}
 		values.push_back(f);
@@ -279,56 +278,64 @@ bool parseDiffract(std::vector<std::string> args, Scene& scene, const std::strin
 }
 
 bool parseMaterials(std::vector<std::string> args, Scene& scene) {
-	if (args.size() != 2) return false;
-	std::filesystem::path p(scene.filepath);
-	std::string mtlpath = (p.parent_path() / std::filesystem::path(args[1])).string();
-	std::ifstream file = std::ifstream(mtlpath);
-	if (!file.is_open()) {
-		WARN("Unable to open file \"%s\"", mtlpath);
-		return false;
-	}
-	std::string line;
-	int linecount = 0;
-	std::string curr = "";
-	while (std::getline(file, line)) {
-		linecount++;
-		std::vector<std::string> args = lineargs(line);
-		if (args.size() > 0 && args[0] != "#") {
-			bool success = true;
-			if (args[0] == "newmtl") {
-				success = parseNewmtl(args, scene, curr);
-			} else if (args[0] == "convert") {
-				success = parseConvert(args, scene, curr);
-			} else if (args[0] == "diffuse") {
-				success = parseDiffuse(args, scene, curr);
-			} else if (args[0] == "specular") {
-				success = parseSpecular(args, scene, curr);
-			} else if (args[0] == "ambient") {
-				success = parseAmbient(args, scene, curr);
-			} else if (args[0] == "absorb") {
-				success = parseAbsorb(args, scene, curr);
-			} else if (args[0] == "ior") {
-				success = parseIOR(args, scene, curr);
-			} else if (args[0] == "shiny") {
-				success = parseShiny(args, scene, curr);
-			} else if (args[0] == "type") {
-				success = parseMaterialType(args, scene, curr);
-			} else if (args[0] == "emission") {
-				success = parseEmission(args, scene, curr);
-			} else if (args[0] == "diffract") {
-				success = parseDiffract(args, scene, curr);
-			} else if (args[0] == "transmission") {
-				success = parseTransmission(args, scene, curr);
-			} else {
-				WARN("Skipping property \"%s\", no specification implemented", args[0].c_str());
-			}
-			if (!success) {
-				WARN("Unable to parse line %d of \"%s\"", linecount, mtlpath.c_str());
-				return false;
-			}
-		}
-	}
-	return true;
+    if (args.size() != 2) return false;
+    std::string sceneDir;
+    {
+        std::size_t pos = scene.filepath.find_last_of("/\\");
+        if (pos == std::string::npos) {
+            sceneDir = ".";
+        } else {
+            sceneDir = scene.filepath.substr(0, pos);
+        }
+    }
+    std::string mtlpath = sceneDir + "/" + args[1];
+    std::ifstream file = std::ifstream(mtlpath);
+    if (!file.is_open()) {
+        WARN("Unable to open file \"%s\"", mtlpath.c_str());
+        return false;
+    }
+    std::string line;
+    int linecount = 0;
+    std::string curr = "";
+    while (std::getline(file, line)) {
+        linecount++;
+        std::vector<std::string> args = lineargs(line);
+        if (args.size() > 0 && args[0] != "#") {
+            bool success = true;
+            if (args[0] == "newmtl") {
+                success = parseNewmtl(args, scene, curr);
+            } else if (args[0] == "convert") {
+                success = parseConvert(args, scene, curr);
+            } else if (args[0] == "diffuse") {
+                success = parseDiffuse(args, scene, curr);
+            } else if (args[0] == "specular") {
+                success = parseSpecular(args, scene, curr);
+            } else if (args[0] == "ambient") {
+                success = parseAmbient(args, scene, curr);
+            } else if (args[0] == "absorb") {
+                success = parseAbsorb(args, scene, curr);
+            } else if (args[0] == "ior") {
+                success = parseIOR(args, scene, curr);
+            } else if (args[0] == "shiny") {
+                success = parseShiny(args, scene, curr);
+            } else if (args[0] == "type") {
+                success = parseMaterialType(args, scene, curr);
+            } else if (args[0] == "emission") {
+                success = parseEmission(args, scene, curr);
+            } else if (args[0] == "diffract") {
+                success = parseDiffract(args, scene, curr);
+            } else if (args[0] == "transmission") {
+                success = parseTransmission(args, scene, curr);
+            } else {
+                WARN("Skipping property \"%s\", no specification implemented", args[0].c_str());
+            }
+            if (!success) {
+                WARN("Unable to parse line %d of \"%s\"", linecount, mtlpath.c_str());
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 bool setMaterial(std::vector<std::string> args, Scene& scene, int& currmat) {
@@ -342,9 +349,9 @@ Scene Parser::parse(std::string filepath) {
     Scene sd{};
     std::ifstream file = std::ifstream(filepath);
     if (!file.is_open()) {
-		WARN("Unable to open file \"%s\"", filepath);
-		return sd;
-	}
+        WARN("Unable to open file \"%s\"", filepath.c_str());
+        return sd;
+    }
 	sd.filepath = filepath;
     std::string line;
     int linecount = 0;
