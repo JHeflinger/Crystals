@@ -27,6 +27,7 @@ Image Renderer::render(Scene scene, size_t w, size_t h) {
         return img;
     }
     size_t cores = std::thread::hardware_concurrency();
+    INFO("Parallelizing across %d cores...", (int)cores);
     m_counter = 0;
     img.w = w;
     img.h = h;
