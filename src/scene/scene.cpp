@@ -16,21 +16,22 @@ Spectrum Scene::shade(int x, int y) {
     std::vector<glm::vec2> offsets = Halton::generate(GlobalConfig::pathSamples(), x, y);
     for (int i = 0; i < count; i++) {
         Ray ray = camera.generateRay(x, y, offsets[i].x, offsets[i].y);
-        s += shade(ray, (Medium){ 1.0f, 0, MaterialUtils::AirMaterial(), Spectrum(1.0f), NMSAMPLES, ray.p}, true);
+        s += shade(ray, (Medium){ 1.0f, 0, MaterialUtils::AirMaterial(), Spectrum(1.0f), NMSAMPLES, ray.p}, 0);
     }
     return s / float(count);
 }
 
-Spectrum Scene::shade(const Ray& ray, const Medium& medium, bool area) {
-    if (area) {
-        Hit h = intersect2(ray);
-        if (h.t > 0.0f) 
+Spectrum Scene::shade(const Ray& ray, const Medium& medium, int recur) {
+    Hit h = intersect(ray);
+    if (recur == 0) {
+        Hit h1 = intersect2(ray);
+        if (h1.t > 0.0 && (h1.t < h.t || h.t <= 0.0f))
         {
-            return (GlobalConfig::pathtrace() ? pathColor(h, medium, area) : rayColor(h, medium));
+            return (GlobalConfig::pathtrace() ? pathColor(h1, medium, recur) : rayColor(h1, medium, recur));
         }
     }
-    Hit h = intersect(ray);
-    if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium, area) : rayColor(h, medium));
+   
+    if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium, recur) : rayColor(h, medium, recur));
 	else if (GlobalConfig::pathtrace() && medium.material != MaterialUtils::AirMaterial()) {
 		// DIRECT LIGHTING ON MISS
 		Hit h2{};
@@ -70,7 +71,7 @@ Hit Scene::intersect(const Ray& ray) const {
 Hit Scene::intersect2(const Ray& ray) const {
     Hit h{};
     h.t = -1.0f;
-    if (bvh2.size() == 0 || !BVH::intersect(ray, 0, bvh2)) return h;
+    if (lPrimitive.size() == 0 || !BVH::intersect(ray, 0, bvh2)) return h;
     h = traverse2(ray, 0);
     h.d2c = glm::normalize(ray.p - h.p);
 	if (glm::dot(h.n, h.d2c) < 0.0f) h.n *= -1.0f; // comment out for more interesting outputs while raytracing diffraction
@@ -150,7 +151,7 @@ std::vector<vertex> sampleAreaLights(const Light& light, int samples, std::unifo
     return positions;
 }
 
-Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
+Spectrum Scene::rayColor(const Hit& hit, const Medium& medium, int recur) {
     Material* m = hit.material < 0 ? MaterialUtils::DefaultMaterial() : &(materials[hit.material]);
     // DIRECT LIGHTING
     Spectrum s = m->ambient().spectrum();
@@ -192,7 +193,7 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
             split[i] = Optics::DielectricFresnel(hit.d2c, hit.n, medium.ior, m->ior().evaluate(Spectrum::wavelength(i)));
         }
         glm::vec3 reflect_dir = glm::normalize(jlm::reflect(hit.d2c, hit.n));
-        Spectrum reflected = shade((Ray){ hit.p + reflect_dir*EPSILON, reflect_dir }, (Medium){ medium.ior, newbounces, m, newT, medium.wavelength, hit.p }, false) * split;
+        Spectrum reflected = shade((Ray){ hit.p + reflect_dir*EPSILON, reflect_dir }, (Medium){ medium.ior, newbounces, m, newT, medium.wavelength, hit.p }, recur + 1) * split;
         Spectrum refracted = Spectrum(0.0f);
         for (int i = 0; i < NMSAMPLES; i++) {
 			if (medium.wavelength < NMSAMPLES) i = medium.wavelength;
@@ -200,7 +201,7 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
             float ior = newm->ior().evaluate(Spectrum::wavelength(i));
             if (ior > 0.0f) {
                 glm::vec3 refract_dir = glm::normalize(glm::refract(hit.d2c, hit.n, medium.ior / ior));
-                refracted[i] += shade((Ray){ hit.p + refract_dir*EPSILON, refract_dir }, (Medium){ ior, newbounces, newm, newT, i, hit.p }, false)[i] * (1.0f - split[i]);
+                refracted[i] += shade((Ray){ hit.p + refract_dir*EPSILON, refract_dir }, (Medium){ ior, newbounces, newm, newT, i, hit.p }, recur + 1)[i] * (1.0f - split[i]);
             }
 			if (medium.wavelength < NMSAMPLES) break;
         }
@@ -216,7 +217,7 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
 
 
 
-Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, bool area) {
+Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, int recur) {
     Material* m = hit.material < 0 ? MaterialUtils::DefaultMaterial() : &(materials[hit.material]);
 
 
@@ -258,7 +259,7 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, bool area) {
                 glm::vec3 lightNormal = glm::normalize(point - light.position);
                 float cosTheta = glm::dot(hit.n, dirNorm);
                 float cosLight = glm::dot(-dirNorm, lightNormal);
-                if (hit.material == 6) {
+                if (hit.material == materials.size() - 1) {
                     cosLight = -cosLight;
                     cosTheta = -cosTheta;
                 }
@@ -275,9 +276,8 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, bool area) {
                 s += diffuse * cosLight * factor * medium.throughput / lightPositions.size();
             }
         }
-       
     }
-    if (hit.material == 6) {
+    if (hit.material == materials.size() - 1) {
         s.translate(m->convert());
         return s;
     }
@@ -296,7 +296,7 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, bool area) {
 			} 
 			if (recurse) s += shade(
 					(Ray){ hit.p + samples[i].incoming*EPSILON, samples[i].incoming },
-					(Medium){ samples[i].ior, medium.bounces + 1, m, newT, samples[i].wavelength, hit.p }, false);
+					(Medium){ samples[i].ior, medium.bounces + 1, m, newT, samples[i].wavelength, hit.p }, recur + 1);
 		}
 	}
 

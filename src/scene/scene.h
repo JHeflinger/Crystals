@@ -61,15 +61,15 @@ struct Scene {
     std::mt19937 gen;
     std::uniform_real_distribution<> dis;
     Spectrum shade(int x, int y);
-    Spectrum shade(const Ray& ray, const Medium& medium, bool area);
+    Spectrum shade(const Ray& ray, const Medium& medium, int recur);
 	void pollMetadata(const Ray& ray, glm::vec3& n, glm::vec3& p, glm::vec3& a) const;
 private:
     Hit intersect(const Ray& ray) const;
     Hit intersect2(const Ray& ray) const;
     Hit traverse(const Ray& ray, size_t ind) const;
     Hit traverse2(const Ray& ray, size_t ind) const;
-    Spectrum rayColor(const Hit& hit, const Medium& medium);
-	Spectrum pathColor(const Hit& hit, const Medium& medium, bool area);
+    Spectrum rayColor(const Hit& hit, const Medium& medium, int recur);
+	Spectrum pathColor(const Hit& hit, const Medium& medium, int recur);
     bool sampleAreaLight(const Light& light, const Hit& hit);
 };
 
