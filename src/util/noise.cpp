@@ -103,5 +103,10 @@ float Noise::applyWorley(glm::vec3 p) {
 }
 
 float Noise::applyPerlinWorley(glm::vec3 p) {
-    return 1.f;
+    float perlin = applyPerlin(p * 1.2f);
+    float worley = applyWorley(p * 1.5f);
+    worley = glm::smoothstep(0.2f, 0.8f, worley);
+    float worleyInv = 1.0f - worley;
+    float cloud = perlin * (0.3f + 0.7f * worleyInv);
+    return glm::clamp(cloud, 0.0f, 1.0f);
 }

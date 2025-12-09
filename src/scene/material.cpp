@@ -110,18 +110,18 @@ std::vector<Sample> Material::sample(const Hit& hit, const Medium& medium) const
             glm::vec3 rayDir = glm::normalize(dir);
 
             const float densityScale = 1.25f;
-            const int STEPS = 32;
+            const int STEPS = 16;
             float weight = 0.0f;
 
             // basic raymarch (attenuation only)
             for (int i = 0; i < STEPS; i++) {
                 glm::vec3 pos = medium.previous + rayDir * (distance * (i + 0.5f) / STEPS);
-                float density = Noise::get().applyPerlin(pos);
+                float density = Noise::get().applyPerlinWorley(pos);
                 density = (density < 0.22f) ? 0.0f : (density - 0.5f) * 2.0f;
                 weight += density * densityScale * (distance / STEPS);
             }
 
-            float T = expf(-weight);
+            float T = glm::clamp(expf(-weight), 1.f, 2.f);
             Sample s{};
             s.delta = true;
             s.wavelength = medium.wavelength;
