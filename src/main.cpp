@@ -42,13 +42,13 @@ int main (int argc, char *argv[]) {
             ERROR("Unable to save image");
         }
     } else {
-        for (int i = 0; i < 600; i++) {
+        for (int i = 0; i < 300; i++) {
             if (i >= VSTART) {
 		        Image image = renderer.render(scene, std::stoi(std::string(argv[4])), std::stoi(std::string(argv[5])));
 		        INFO("Finished rendering image %d in %.3f seconds!", i, image.time);
 		        image.save("videos/raws/i_" + std::to_string(i) + ".png");
             }
-		    rotatescene(scene, glm::radians(0.6f));
+		    rotatescene(scene, glm::radians(1.2f));
 	    }
     }
     return 0;
