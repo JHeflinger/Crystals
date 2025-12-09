@@ -99,6 +99,36 @@ bool parseAreaLight(std::vector<std::string> args, Scene& scene) {
     scene.lights.push_back(light);
     return true;
 }
+bool parseAreaLightSphere(std::vector<std::string> args, Scene& scene, int currmat) {
+    // ___, vindex, f1, f2, r, f...
+    if (args.size() < 5) return false;
+    int i1;
+    float f1, f2;
+    bool success = parseInt(args[1], i1) && parseFloat(args[2], f1) && parseFloat(args[3], f2);
+    if (!success) return false;
+    if (i1 == 0 || i1 > scene.vertices.size()) {
+        WARN("Detected reference does not exist");
+        return false;
+    }
+	Fourier f;
+    float r;
+    success = parseFloat(args[4], r);
+    if (!success) return false;
+	if (f1 != f2 && args.size() > 5) f = parseFourier(std::vector<std::string>(args.begin() + 5, args.end()), f1, f2);
+    Light light = {
+        scene.vertices[i1 - 1],
+        f,
+        glm::vec3(0),
+        glm::vec3(0),
+        0, 0,
+        glm::vec3(0),
+        glm::vec3(0),
+        r
+    };
+    scene.lights.push_back(light);
+    scene.lPrimitive.push_back(PrimitiveUtils::sphere(scene.vertices[i1 - 1], r + 0.001, currmat));
+    return true;
+}
 
 bool parseDirectionalLight(std::vector<std::string> args, Scene& scene) {
     if (args.size() < 4) return false;
@@ -398,8 +428,9 @@ Scene Parser::parse(std::string filepath) {
                 success = parseDirectionalLight(args, sd);
             } else if (args[0] == "la") {
                 success = parseAreaLight(args, sd);
-            }
-            else if (args[0] == "camera") {
+            } else if (args[0] == "lsphere") {
+                success = parseAreaLightSphere(args, sd, currmat);
+            } else if (args[0] == "camera") {
                 success = parseCamera(args, sd);
             } else if (args[0] == "sphere") {
                 success = parseSphere(args, sd, currmat);

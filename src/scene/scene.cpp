@@ -22,6 +22,13 @@ Spectrum Scene::shade(int x, int y) {
 }
 
 Spectrum Scene::shade(const Ray& ray, const Medium& medium, bool area) {
+    if (area) {
+        Hit h = intersect2(ray);
+        if (h.t > 0.0f) 
+        {
+            return (GlobalConfig::pathtrace() ? pathColor(h, medium, area) : rayColor(h, medium));
+        }
+    }
     Hit h = intersect(ray);
     if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium, area) : rayColor(h, medium));
 	else if (GlobalConfig::pathtrace() && medium.material != MaterialUtils::AirMaterial()) {
@@ -60,6 +67,17 @@ Hit Scene::intersect(const Ray& ray) const {
     return h;
 }
 
+Hit Scene::intersect2(const Ray& ray) const {
+    Hit h{};
+    h.t = -1.0f;
+    if (bvh2.size() == 0 || !BVH::intersect(ray, 0, bvh2)) return h;
+    h = traverse2(ray, 0);
+    h.d2c = glm::normalize(ray.p - h.p);
+	if (glm::dot(h.n, h.d2c) < 0.0f) h.n *= -1.0f; // comment out for more interesting outputs while raytracing diffraction
+    h.d2r = glm::normalize(jlm::reflect(h.d2c, h.n));
+    return h;
+}
+
 Hit Scene::traverse(const Ray& ray, size_t ind) const {
     NodeBVH node = bvh[ind];
     if (node.config == BranchBVH::LEAF) return PrimitiveUtils::intersect(ray, primitives[node.left]);
@@ -77,8 +95,44 @@ Hit Scene::traverse(const Ray& ray, size_t ind) const {
     return h;
 }
 
+Hit Scene::traverse2(const Ray& ray, size_t ind) const {
+    NodeBVH node = bvh2[ind];
+    if (node.config == BranchBVH::LEAF) return PrimitiveUtils::intersect(ray, lPrimitive[node.left]);
+    Hit hl, hr;
+    hl.t = -1.0f;
+    hr.t = -1.0f;
+    if (node.config == BranchBVH::LEFT || node.config == BranchBVH::BOTH)
+        if (BVH::intersect(ray, node.left, bvh2)) hl = traverse2(ray, node.left);
+    if (node.config == BranchBVH::RIGHT || node.config == BranchBVH::BOTH)
+        if (BVH::intersect(ray, node.right, bvh2)) hr = traverse2(ray, node.right);
+    Hit h;
+    h.t = -1.0f;
+    if (hl.t > 0 && (h.t < 0 || hl.t < h.t)) h = hl;
+    if (hr.t > 0 && (h.t < 0 || hr.t < h.t)) h = hr;
+    return h;
+}
+
 std::pair<float, float> getRandomPoint(std::uniform_real_distribution<> &dis, std::mt19937 &gen) {
     return {(static_cast<float>(dis(gen))), (static_cast<float>(dis(gen)))};
+}
+
+std::vector<vertex> sampleSpherePoints(const Light& light, int samples, std::uniform_real_distribution<>& dis, std::mt19937& gen) {
+    std::vector<glm::vec3> positions;
+    auto center = light.position;
+    auto radius = light.radius;
+    int n = samples;
+    for (int i = 0; i < n; i++) {
+        float u1 = dis(gen);
+        float u2 = dis(gen);
+
+        float z = 1.0f - 2.0f * u1;
+        float r = sqrtf(1.0f - z*z);
+        float phi = 2.0f * M_PI * u2;
+        float x = r * cosf(phi);
+        float y = r * sinf(phi);
+        positions.push_back(center + radius * glm::vec3(x, y, z));
+    }
+    return positions;
 }
 
 std::vector<vertex> sampleAreaLights(const Light& light, int samples, std::uniform_real_distribution<> &dis, std::mt19937 &gen) {
@@ -98,7 +152,6 @@ std::vector<vertex> sampleAreaLights(const Light& light, int samples, std::unifo
 
 Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
     Material* m = hit.material < 0 ? MaterialUtils::DefaultMaterial() : &(materials[hit.material]);
-
     // DIRECT LIGHTING
     Spectrum s = m->ambient().spectrum();
     for (int i = 0; i < lights.size(); i++) {
@@ -176,26 +229,57 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, bool area) {
     int samp = 25;
     for (auto light : lights) {
         // assuming area lights
-        float u = dis(gen);
-        float v = dis(gen);
-        auto lightPositions = sampleAreaLights(light, samp, dis, gen);
-        for (const auto point : lightPositions) {
-            glm::vec3 direction = point - hit.p;
-            glm::vec3 dirNorm = glm::normalize(direction);
-            float dist = glm::length(direction);
-            glm::vec3 lightNormal = glm::normalize(glm::cross(light.wvec, light.hvec));
-            float cosLight = glm::dot(-dirNorm, lightNormal);
-            if (cosLight <= 0.0f) {
-                continue;
+        if (light.radius == 0.0f) {
+            auto lightPositions = sampleAreaLights(light, samp, dis, gen);
+            for (const auto &point : lightPositions) {
+                glm::vec3 direction = point - hit.p;
+                glm::vec3 dirNorm = glm::normalize(direction);
+                float dist = glm::length(direction);
+                glm::vec3 lightNormal = glm::normalize(glm::cross(light.wvec, light.hvec));
+                float cosTheta = glm::dot(hit.n, dirNorm);
+                float cosLight = glm::dot(-dirNorm, lightNormal);
+                if (cosLight <= 0.0f || cosTheta <= 0.0f) {
+                    continue;
+                }
+                float t = intersect({ hit.p + dirNorm * EPSILON, dirNorm}).t;
+                if (t >= 0.0 && t < dist) continue;
+                float area = glm::length(glm::cross(light.wvec, light.hvec));
+                
+                Spectrum diffuse = Spectrum(light.color) * m->diffuse().evaluate(cosTheta) / M_PI;
+                float factor = area / (dist * dist);
+                s += diffuse * cosLight * factor * medium.throughput / lightPositions.size();
             }
-            float t = intersect({ hit.p + dirNorm * EPSILON, dirNorm}).t;
-            if (t >= 0.0 && t < hit.t) continue;
-            float area = glm::length(glm::cross(light.wvec, light.hvec));
-            float cosTheta = std::max(0.0f, glm::dot(hit.n, dirNorm));
-            Spectrum diffuse = Spectrum(light.color) * m->diffuse().evaluate(cosTheta) / M_PI;
-            float factor = area / (dist * dist);
-            s += diffuse * cosLight * factor * medium.throughput / lightPositions.size();
+        } else {
+            auto lightPositions = sampleSpherePoints(light, samp, dis, gen);
+            for (const auto &point : lightPositions) {
+                glm::vec3 direction = point - hit.p;
+                glm::vec3 dirNorm = glm::normalize(direction);
+                float dist = glm::length(direction);
+                glm::vec3 lightNormal = glm::normalize(point - light.position);
+                float cosTheta = glm::dot(hit.n, dirNorm);
+                float cosLight = glm::dot(-dirNorm, lightNormal);
+                if (hit.material == 6) {
+                    cosLight = -cosLight;
+                    cosTheta = -cosTheta;
+                }
+                if (cosLight <= 0.0f || cosTheta <= 0.0f) {
+                    continue;
+                }
+                float t = intersect({ hit.p + dirNorm * EPSILON, dirNorm}).t;
+                if (t >= 0.0 && t < dist) {
+                    continue;
+                }
+                float area = 4.0f * M_PI * light.radius * light.radius;
+                Spectrum diffuse = Spectrum(light.color) * m->diffuse().evaluate(cosTheta) / M_PI;
+                float factor = area / (dist * dist);
+                s += diffuse * cosLight * factor * medium.throughput / lightPositions.size();
+            }
         }
+       
+    }
+    if (hit.material == 6) {
+        s.translate(m->convert());
+        return s;
     }
 	std::vector<Sample> samples = m->sample(hit, medium);
 	for (int i = 0; i < samples.size(); i++) {
