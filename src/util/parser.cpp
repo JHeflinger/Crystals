@@ -101,6 +101,7 @@ bool parseAreaLight(std::vector<std::string> args, Scene& scene) {
 }
 bool parseAreaLightSphere(std::vector<std::string> args, Scene& scene, int currmat) {
     // ___, vindex, f1, f2, r, f...
+    // MAKE SURE OT HAVE GLASS MTL
     if (args.size() < 5) return false;
     int i1;
     float f1, f2;
