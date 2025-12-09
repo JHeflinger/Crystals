@@ -7,7 +7,8 @@
 
 enum MaterialType {
 	LAMBERTIAN,
-	DIELECTRIC
+    DIELECTRIC,
+    VOLUMETRIC
 };
 
 struct Sample {
@@ -17,6 +18,11 @@ struct Sample {
 	bool delta;
 	int wavelength;
 	float ior;
+
+    // raymarching
+    bool isVolume = false;
+    float transmission;
+    glm::vec3 eventPos = glm::vec3(0);
 };
 
 struct Medium;
@@ -29,6 +35,7 @@ public:
 public:
     void configureAir();
     void configureDefault();
+    void configureFog();
 public:
     const Fourier& ambient() const { return m_ambient; }
     const Fourier& convert() const { return m_convert; }
@@ -40,7 +47,7 @@ public:
 	const Fourier& transmission() const { return m_transmission; }
     float shiny() const { return m_shiny; }
 	bool emissive() const { return m_emissive; }
-	bool diffract() const { return m_diffract; }
+    bool diffract() const { return m_diffract; }
 	MaterialType type() const { return m_type; }
 public:
 	void configureAmbient(Fourier f) { m_ambient = f; }
@@ -73,6 +80,7 @@ namespace MaterialUtils {
     void initGlobalMaterials();
     Material* DefaultMaterial();
     Material* AirMaterial();
+    Material* FogMaterial();
 };
 
 namespace SampleUtils {

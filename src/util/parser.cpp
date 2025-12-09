@@ -263,9 +263,10 @@ bool parseShiny(std::vector<std::string> args, Scene& scene, const std::string& 
 }
 
 bool parseMaterialType(std::vector<std::string> args, Scene& scene, const std::string& curr) {
-	if (args.size() != 2) return false;
+    if (args.size() != 2) return false;
 	if (args[1] == "dielectric") scene.materials[scene.matmap[curr]].configureType(DIELECTRIC);
 	else if (args[1] == "lambertian") scene.materials[scene.matmap[curr]].configureType(LAMBERTIAN);
+    else if (args[1] == "volumetric") scene.materials[scene.matmap[curr]].configureType(VOLUMETRIC);
 	else return false;
 	return true;
 }

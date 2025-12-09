@@ -7,7 +7,7 @@ absorb 400 700 0.875 0.99 0.99 0.98 0.875 0.875
 ior 100 700 1.53 1.52 1.5 1.491 1.475 1.45 1.42 1.41 1.389 1.3504
 transmission 100 700 1.0
 shiny 25.0
-type dielectric
+type volumetric
 diffract true
 
 newmtl matte

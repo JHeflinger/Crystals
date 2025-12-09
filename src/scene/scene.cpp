@@ -23,7 +23,7 @@ Spectrum Scene::shade(int x, int y) {
 Spectrum Scene::shade(const Ray& ray, const Medium& medium) {
     Hit h = intersect(ray);
     if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium) : rayColor(h, medium));
-	else if (GlobalConfig::pathtrace() && medium.material != MaterialUtils::AirMaterial()) {
+    else if (GlobalConfig::pathtrace() && medium.material->type() != VOLUMETRIC &&  medium.material != MaterialUtils::AirMaterial()) {
 		// DIRECT LIGHTING ON MISS
 		Hit h2{};
 		h2.n = ray.d;
@@ -133,7 +133,11 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium) {
 	for (int i = 0; i < samples.size(); i++) {
 		if (samples[i].pdf > 0 && medium.bounces < GlobalConfig::maxDepth()) {
 			float cosTheta = std::max(0.0f, glm::dot(samples[i].incoming, hit.n));
-			Spectrum newT = medium.throughput * (samples[i].color * (samples[i].delta ? 1.0f : cosTheta / samples[i].pdf));
+            bool volPass = (m->type() == VOLUMETRIC) && samples[i].delta;
+            Material* nextMedMat = volPass ? medium.material : m;
+            Spectrum newT = medium.throughput * (volPass ? Spectrum(samples[i].transmission)
+                                                         : (samples[i].color * (samples[i].delta ? 1.0f
+                                                                                                 : cosTheta / samples[i].pdf)));
 
 			// RUSSIAN ROULETTE
 			bool recurse = true;
@@ -141,10 +145,15 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium) {
 				float p = CLAMP(newT.max(), 0.05f, 1.0f);
 				if (jlm::random01() > p) recurse = false;
 				else newT /= p;
-			} 
-			if (recurse) s += shade(
-					(Ray){ hit.p + samples[i].incoming*EPSILON, samples[i].incoming },
-					(Medium){ samples[i].ior, medium.bounces + 1, m, newT, samples[i].wavelength, hit.p });
+            }
+
+            if (recurse) {
+                s += shade(
+                    (Ray){ hit.p + samples[i].incoming * EPSILON, samples[i].incoming },
+                    (Medium){ samples[i].ior, medium.bounces + 1, nextMedMat, newT,
+                              samples[i].wavelength, hit.p }
+                    );
+            }
 		}
 	}
 
