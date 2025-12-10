@@ -12,7 +12,7 @@ def make_video(input_dir, output_file):
     cmd = [
         "ffmpeg",
         "-y",                      # overwrite output
-        "-framerate", "60",        # input framerate
+        "-framerate", "30",        # input framerate
         "-i", os.path.join(input_dir, "i_%d.png"),
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
