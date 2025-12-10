@@ -7,7 +7,7 @@ absorb 400 700 0.875 0.99 0.99 0.98 0.875 0.875
 ior 100 700 1.53 1.52 1.5 1.491 1.475 1.45 1.42 1.41 1.389 1.3504
 transmission 100 700 1.0
 shiny 25.0
-type dielectric
+type volumetric
 diffract true
 
 newmtl matte
@@ -32,10 +32,22 @@ type lambertian
 diffract false
 
 newmtl sun
-emission 100 700 0.2
+emission 100 700 0.05
 
 newmtl ceiling
 emission 100 700 0.01
 
 newmtl blacklight
 emission 100 700 0.6 0.3 0.15 0.075 0.0325 0.01625 0.008135
+
+newmtl fog
+convert 0 0
+diffuse 0 0
+specular 0 0
+ambient 400 700 0
+absorb 400 700 0.875 0.99 0.99 0.98 0.875 0.875
+ior 100 700 1.53 1.52 1.5 1.491 1.475 1.45 1.42 1.41 1.389 1.3504
+transmission 100 700 1.0
+shiny 25.0
+type dielectric
+diffract true
