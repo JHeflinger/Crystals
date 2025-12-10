@@ -8,6 +8,7 @@ endif()
 
 set(EXECUTABLE_NAME "spectrum")
 project(${EXECUTABLE_NAME})
+
 add_definitions ( -DEXEC_NAME="${EXECUTABLE_NAME}" )
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 
