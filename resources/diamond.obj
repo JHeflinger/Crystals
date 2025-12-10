@@ -833,6 +833,6 @@ f 297 298 299 300
 
 usemtl sun
 
-sphere 292 0.2
+# sphere 292 0.2
 
-# lsphere 292 100 700 0.2 0.02
+lsphere 292 100 700 0.2 0.02
