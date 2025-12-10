@@ -26,11 +26,11 @@ Spectrum Scene::shade(const Ray& ray, const Medium& medium, int recur) {
     if (recur == 0) {
         Hit h1 = intersect2(ray);
         if (h1.t > 0.0 && (h1.t < h.t || h.t <= 0.0f)) {
-            return (GlobalConfig::pathtrace() ? pathColor(h1, medium, recur) : rayColor(h1, medium, recur));
+            return (GlobalConfig::pathtrace() ? pathColor(h1, medium, recur, true) : rayColor(h1, medium, recur));
         }
     }
    
-    if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium, recur) : rayColor(h, medium, recur));
+    if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium, recur, false) : rayColor(h, medium, recur));
 	else if (GlobalConfig::pathtrace() && medium.material->type() != VOLUMETRIC && medium.material != MaterialUtils::AirMaterial()) {
 		// DIRECT LIGHTING ON MISS
 		Hit h2{};
@@ -216,7 +216,7 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium, int recur) {
 
 
 
-Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, int recur) {
+Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, int recur, bool light) {
     Material* m = hit.material < 0 ? MaterialUtils::DefaultMaterial() : &(materials[hit.material]);
 
 	// EMISSION
@@ -276,7 +276,7 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, int recur) {
             }
         }
     }
-    if (hit.material == materials.size() - 1) {
+    if (light) {
         s.translate(m->convert());
         return s;
     }

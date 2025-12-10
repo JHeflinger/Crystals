@@ -1,4 +1,5 @@
 #include "noise.h"
+#include <algorithm>
 #include <glm/glm.hpp>
 
 Noise::Noise() {}

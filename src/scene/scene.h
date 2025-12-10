@@ -69,7 +69,7 @@ private:
     Hit traverse(const Ray& ray, size_t ind) const;
     Hit traverse2(const Ray& ray, size_t ind) const;
     Spectrum rayColor(const Hit& hit, const Medium& medium, int recur);
-	Spectrum pathColor(const Hit& hit, const Medium& medium, int recur);
+	Spectrum pathColor(const Hit& hit, const Medium& medium, int recur, bool light);
     bool sampleAreaLight(const Light& light, const Hit& hit);
 };
 
