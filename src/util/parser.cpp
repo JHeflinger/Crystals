@@ -41,7 +41,7 @@ Fourier parseFourier(std::vector<std::string> args, int start, int end) {
 	for (int i = 0; i < args.size(); i++) {
 		float f;
 		if (!parseFloat(args[i], f)) {
-			WARN("Invalid float detected: \"%s\"", args[i]);
+            WARN("Invalid float detected: \"%s\"", args[i].c_str());
 			continue;
 		}
 		values.push_back(f);
@@ -68,6 +68,67 @@ bool parseNonGeometric(std::vector<std::string> args, Scene& scene) {
     return true;
 }
 
+bool parseAreaLight(std::vector<std::string> args, Scene& scene) {
+    if (args.size() < 10) return false;
+    int i1;
+    float f1, f2;
+    bool success = parseInt(args[1], i1) && parseFloat(args[2], f1) && parseFloat(args[3], f2);
+    if (!success) return false;
+    if (i1 == 0 || i1 > scene.vertices.size()) {
+        WARN("Detected reference does not exist");
+        return false;
+    }
+	Fourier f;
+    float wx, wy, wz, hx, hy, hz;
+    success = parseFloat(args[4], wx) && parseFloat(args[5], wy) && parseFloat(args[6], wz) &&
+    parseFloat(args[7], hx) && parseFloat(args[8], hy) && parseFloat(args[9], hz);
+    if (!success) return false;
+	if (f1 != f2 && args.size() > 10) f = parseFourier(std::vector<std::string>(args.begin() + 10, args.end()), f1, f2);
+    
+
+    Light light = {
+        scene.vertices[i1 - 1],
+        f,
+        glm::vec3(0),
+        glm::vec3(0),
+        0, 0,
+        glm::vec3(wx, wy, wz),
+        glm::vec3(hx, hy, hz)
+    };
+    scene.lights.push_back(light);
+    return true;
+}
+
+bool parseAreaLightSphere(std::vector<std::string> args, Scene& scene, int currmat) {
+    if (args.size() < 5) return false;
+    int i1;
+    float f1, f2;
+    bool success = parseInt(args[1], i1) && parseFloat(args[2], f1) && parseFloat(args[3], f2);
+    if (!success) return false;
+    if (i1 == 0 || i1 > scene.vertices.size()) {
+        WARN("Detected reference does not exist");
+        return false;
+    }
+	Fourier f;
+    float r;
+    success = parseFloat(args[4], r);
+    if (!success) return false;
+	if (f1 != f2 && args.size() > 5) f = parseFourier(std::vector<std::string>(args.begin() + 5, args.end()), f1, f2);
+    Light light = {
+        scene.vertices[i1 - 1],
+        f,
+        glm::vec3(0),
+        glm::vec3(0),
+        0, 0,
+        glm::vec3(0),
+        glm::vec3(0),
+        r
+    };
+    scene.lights.push_back(light);
+    scene.lPrimitive.push_back(PrimitiveUtils::sphere(scene.vertices[i1 - 1], r + 0.001, currmat));
+    return true;
+}
+
 bool parseDirectionalLight(std::vector<std::string> args, Scene& scene) {
     if (args.size() < 4) return false;
     int i1;
@@ -85,7 +146,9 @@ bool parseDirectionalLight(std::vector<std::string> args, Scene& scene) {
         f,
         glm::vec3(0),
         glm::normalize(scene.nongeos[i1 - 1] * -1.0f),
-        0, 0
+        0, 0,
+        glm::vec4(0.0f),
+        glm::vec4(0.0f)
     };
     scene.lights.push_back(light);
     return true;
@@ -266,6 +329,7 @@ bool parseMaterialType(std::vector<std::string> args, Scene& scene, const std::s
 	if (args.size() != 2) return false;
 	if (args[1] == "dielectric") scene.materials[scene.matmap[curr]].configureType(DIELECTRIC);
 	else if (args[1] == "lambertian") scene.materials[scene.matmap[curr]].configureType(LAMBERTIAN);
+    else if (args[1] == "volumetric") scene.materials[scene.matmap[curr]].configureType(VOLUMETRIC);
 	else return false;
 	return true;
 }
@@ -284,7 +348,7 @@ bool parseMaterials(std::vector<std::string> args, Scene& scene) {
 	std::string mtlpath = (p.parent_path() / std::filesystem::path(args[1])).string();
 	std::ifstream file = std::ifstream(mtlpath);
 	if (!file.is_open()) {
-		WARN("Unable to open file \"%s\"", mtlpath);
+        WARN("Unable to open file \"%s\"", mtlpath.c_str());
 		return false;
 	}
 	std::string line;
@@ -340,9 +404,11 @@ bool setMaterial(std::vector<std::string> args, Scene& scene, int& currmat) {
 
 Scene Parser::parse(std::string filepath) {
     Scene sd{};
+    sd.gen = std::mt19937(std::random_device{}());
+    sd.dis = std::uniform_real_distribution<>(0.0, 1.0);
     std::ifstream file = std::ifstream(filepath);
     if (!file.is_open()) {
-		WARN("Unable to open file \"%s\"", filepath);
+        WARN("Unable to open file \"%s\"", filepath.c_str());
 		return sd;
 	}
 	sd.filepath = filepath;
@@ -360,6 +426,10 @@ Scene Parser::parse(std::string filepath) {
                 success = parseNonGeometric(args, sd);
             } else if (args[0] == "ld") {
                 success = parseDirectionalLight(args, sd);
+            } else if (args[0] == "la") {
+                success = parseAreaLight(args, sd);
+            } else if (args[0] == "lsphere") {
+                success = parseAreaLightSphere(args, sd, currmat);
             } else if (args[0] == "camera") {
                 success = parseCamera(args, sd);
             } else if (args[0] == "sphere") {

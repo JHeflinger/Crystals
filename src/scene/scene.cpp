@@ -6,6 +6,7 @@
 #include "util/jlm.h"
 #include "util/halton.h"
 #include "renderer/config.h"
+#include <iostream>
 
 #define EPSILON 0.0001f
 
@@ -15,15 +16,22 @@ Spectrum Scene::shade(int x, int y) {
     std::vector<glm::vec2> offsets = Halton::generate(GlobalConfig::pathSamples(), x, y);
     for (int i = 0; i < count; i++) {
         Ray ray = camera.generateRay(x, y, offsets[i].x, offsets[i].y);
-        s += shade(ray, (Medium){ 1.0f, 0, MaterialUtils::AirMaterial(), Spectrum(1.0f), NMSAMPLES, ray.p});
+        s += shade(ray, (Medium){ 1.0f, 0, MaterialUtils::AirMaterial(), Spectrum(1.0f), NMSAMPLES, ray.p}, 0);
     }
     return s / float(count);
 }
 
-Spectrum Scene::shade(const Ray& ray, const Medium& medium) {
+Spectrum Scene::shade(const Ray& ray, const Medium& medium, int recur) {
     Hit h = intersect(ray);
-    if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium) : rayColor(h, medium));
-	else if (GlobalConfig::pathtrace() && medium.material != MaterialUtils::AirMaterial()) {
+    if (recur == 0) {
+        Hit h1 = intersect2(ray);
+        if (h1.t > 0.0 && (h1.t < h.t || h.t <= 0.0f)) {
+            return (GlobalConfig::pathtrace() ? pathColor(h1, medium, recur) : rayColor(h1, medium, recur));
+        }
+    }
+   
+    if (h.t > 0.0f) return (GlobalConfig::pathtrace() ? pathColor(h, medium, recur) : rayColor(h, medium, recur));
+	else if (GlobalConfig::pathtrace() && medium.material->type() != VOLUMETRIC && medium.material != MaterialUtils::AirMaterial()) {
 		// DIRECT LIGHTING ON MISS
 		Hit h2{};
 		h2.n = ray.d;
@@ -59,6 +67,17 @@ Hit Scene::intersect(const Ray& ray) const {
     return h;
 }
 
+Hit Scene::intersect2(const Ray& ray) const {
+    Hit h{};
+    h.t = -1.0f;
+    if (lPrimitive.size() == 0 || !BVH::intersect(ray, 0, bvh2)) return h;
+    h = traverse2(ray, 0);
+    h.d2c = glm::normalize(ray.p - h.p);
+	if (glm::dot(h.n, h.d2c) < 0.0f) h.n *= -1.0f; // comment out for more interesting outputs while raytracing diffraction
+    h.d2r = glm::normalize(jlm::reflect(h.d2c, h.n));
+    return h;
+}
+
 Hit Scene::traverse(const Ray& ray, size_t ind) const {
     NodeBVH node = bvh[ind];
     if (node.config == BranchBVH::LEAF) return PrimitiveUtils::intersect(ray, primitives[node.left]);
@@ -76,16 +95,89 @@ Hit Scene::traverse(const Ray& ray, size_t ind) const {
     return h;
 }
 
-Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
-    Material* m = hit.material < 0 ? MaterialUtils::DefaultMaterial() : &(materials[hit.material]);
+Hit Scene::traverse2(const Ray& ray, size_t ind) const {
+    NodeBVH node = bvh2[ind];
+    if (node.config == BranchBVH::LEAF) return PrimitiveUtils::intersect(ray, lPrimitive[node.left]);
+    Hit hl, hr;
+    hl.t = -1.0f;
+    hr.t = -1.0f;
+    if (node.config == BranchBVH::LEFT || node.config == BranchBVH::BOTH)
+        if (BVH::intersect(ray, node.left, bvh2)) hl = traverse2(ray, node.left);
+    if (node.config == BranchBVH::RIGHT || node.config == BranchBVH::BOTH)
+        if (BVH::intersect(ray, node.right, bvh2)) hr = traverse2(ray, node.right);
+    Hit h;
+    h.t = -1.0f;
+    if (hl.t > 0 && (h.t < 0 || hl.t < h.t)) h = hl;
+    if (hr.t > 0 && (h.t < 0 || hr.t < h.t)) h = hr;
+    return h;
+}
 
+std::pair<float, float> getRandomPoint(std::uniform_real_distribution<> &dis, std::mt19937 &gen) {
+    return {(static_cast<float>(dis(gen))), (static_cast<float>(dis(gen)))};
+}
+
+std::vector<vertex> sampleSpherePoints(const Light& light, int samples, std::uniform_real_distribution<>& dis, std::mt19937& gen) {
+    std::vector<glm::vec3> positions;
+    auto center = light.position;
+    auto radius = light.radius;
+    int n = samples;
+    for (int i = 0; i < n; i++) {
+        float u1 = dis(gen);
+        float u2 = dis(gen);
+
+        float z = 1.0f - 2.0f * u1;
+        float r = sqrtf(1.0f - z*z);
+        float phi = 2.0f * M_PI * u2;
+        float x = r * cosf(phi);
+        float y = r * sinf(phi);
+        positions.push_back(center + radius * glm::vec3(x, y, z));
+    }
+    return positions;
+}
+
+std::vector<vertex> sampleAreaLights(const Light& light, int samples, std::uniform_real_distribution<> &dis, std::mt19937 &gen) {
+    glm::vec3 pos = light.position;
+    std::vector<glm::vec3> positions;
+    int n = std::sqrt(samples);
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            auto p = getRandomPoint(dis, gen);
+            float u = (i + p.first) / n;
+            float v = (j + p.second) / n;
+            positions.push_back(pos + u * vertex(light.wvec) + v * vertex(light.hvec));
+        }
+    }
+    return positions;
+}
+
+Spectrum Scene::rayColor(const Hit& hit, const Medium& medium, int recur) {
+    Material* m = hit.material < 0 ? MaterialUtils::DefaultMaterial() : &(materials[hit.material]);
     // DIRECT LIGHTING
     Spectrum s = m->ambient().spectrum();
     for (int i = 0; i < lights.size(); i++) {
-        DirectLightData dld = SceneUtils::directLight(lights[i], hit, *m);
-        if (intersect((Ray){ hit.p + dld.d2l*EPSILON, dld.d2l }).t <= 0.0f) {
-            s += (Spectrum(m->absorb()) * dld.color * (m->diffuse().evaluate(dld.diffuse) + m->specular().evaluate(dld.specular)));
+        if (glm::length(lights[i].hvec) != 0.0f) {
+            auto lightPositions = sampleAreaLights(lights[i], 100, dis, gen);
+            Spectrum aggregate(0.0);
+            for (const auto &p : lightPositions) {
+                Light sampleLight = lights[i];
+                sampleLight.position = p;
+                DirectLightData dld = SceneUtils::directLight(sampleLight, hit, *m);
+                auto t = intersect({ hit.p + dld.d2l * EPSILON, dld.d2l }).t;
+                if (t <= 0.0f || t > hit.t) {
+                    aggregate += Spectrum(m->absorb()) *
+                        dld.color *
+                           (m->diffuse().evaluate(dld.diffuse) +
+                            m->specular().evaluate(dld.specular));
+                }
+            }
+            s += aggregate / lightPositions.size();
+        } else {
+            DirectLightData dld = SceneUtils::directLight(lights[i], hit, *m);
+            if (intersect((Ray){ hit.p + dld.d2l*EPSILON, dld.d2l }).t <= 0.0f) {
+                s += (Spectrum(m->absorb()) * dld.color * (m->diffuse().evaluate(dld.diffuse) + m->specular().evaluate(dld.specular)));
+            }
         }
+        
     }
 
 	// UPDATE THROUGHPUT
@@ -100,7 +192,7 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
             split[i] = Optics::DielectricFresnel(hit.d2c, hit.n, medium.ior, m->ior().evaluate(Spectrum::wavelength(i)));
         }
         glm::vec3 reflect_dir = glm::normalize(jlm::reflect(hit.d2c, hit.n));
-        Spectrum reflected = shade((Ray){ hit.p + reflect_dir*EPSILON, reflect_dir }, (Medium){ medium.ior, newbounces, m, newT, medium.wavelength, hit.p }) * split;
+        Spectrum reflected = shade((Ray){ hit.p + reflect_dir*EPSILON, reflect_dir }, (Medium){ medium.ior, newbounces, m, newT, medium.wavelength, hit.p }, recur + 1) * split;
         Spectrum refracted = Spectrum(0.0f);
         for (int i = 0; i < NMSAMPLES; i++) {
 			if (medium.wavelength < NMSAMPLES) i = medium.wavelength;
@@ -108,7 +200,7 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
             float ior = newm->ior().evaluate(Spectrum::wavelength(i));
             if (ior > 0.0f) {
                 glm::vec3 refract_dir = glm::normalize(glm::refract(hit.d2c, hit.n, medium.ior / ior));
-                refracted[i] += shade((Ray){ hit.p + refract_dir*EPSILON, refract_dir }, (Medium){ ior, newbounces, newm, newT, i, hit.p })[i] * (1.0f - split[i]);
+                refracted[i] += shade((Ray){ hit.p + refract_dir*EPSILON, refract_dir }, (Medium){ ior, newbounces, newm, newT, i, hit.p }, recur + 1)[i] * (1.0f - split[i]);
             }
 			if (medium.wavelength < NMSAMPLES) break;
         }
@@ -121,7 +213,10 @@ Spectrum Scene::rayColor(const Hit& hit, const Medium& medium) {
     return s*medium.throughput;
 }
 
-Spectrum Scene::pathColor(const Hit& hit, const Medium& medium) {
+
+
+
+Spectrum Scene::pathColor(const Hit& hit, const Medium& medium, int recur) {
     Material* m = hit.material < 0 ? MaterialUtils::DefaultMaterial() : &(materials[hit.material]);
 
 	// EMISSION
@@ -129,11 +224,70 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium) {
 
 	// PATH
     Spectrum s = Spectrum(0.0f);
+    int samp = 25;
+    for (auto light : lights) {
+        if (recur != 0) break;
+
+        // assuming area lights
+        if (light.radius == 0.0f) {
+            auto lightPositions = sampleAreaLights(light, samp, dis, gen);
+            for (const auto &point : lightPositions) {
+                glm::vec3 direction = point - hit.p;
+                glm::vec3 dirNorm = glm::normalize(direction);
+                float dist = glm::length(direction);
+                glm::vec3 lightNormal = glm::normalize(glm::cross(light.wvec, light.hvec));
+                float cosTheta = glm::dot(hit.n, dirNorm);
+                float cosLight = glm::dot(-dirNorm, lightNormal);
+                if (cosLight <= 0.0f || cosTheta <= 0.0f) {
+                    continue;
+                }
+                float t = intersect({ hit.p + dirNorm * EPSILON, dirNorm}).t;
+                if (t >= 0.0 && t < dist) continue;
+                float area = glm::length(glm::cross(light.wvec, light.hvec));
+                
+                Spectrum diffuse = Spectrum(light.color) * m->diffuse().evaluate(cosTheta) / M_PI;
+                float factor = area / (dist * dist);
+                s += diffuse * cosLight * factor * medium.throughput / lightPositions.size();
+            }
+        } else {
+            auto lightPositions = sampleSpherePoints(light, samp, dis, gen);
+            for (const auto &point : lightPositions) {
+                glm::vec3 direction = point - hit.p;
+                glm::vec3 dirNorm = glm::normalize(direction);
+                float dist = glm::length(direction);
+                glm::vec3 lightNormal = glm::normalize(point - light.position);
+                float cosTheta = glm::dot(hit.n, dirNorm);
+                float cosLight = glm::dot(-dirNorm, lightNormal);
+                if (hit.material == materials.size() - 1) {
+                    cosLight = -cosLight;
+                    cosTheta = -cosTheta;
+                }
+                if (cosLight <= 0.0f || cosTheta <= 0.0f) {
+                    continue;
+                }
+                float t = intersect({ hit.p + dirNorm * EPSILON, dirNorm}).t;
+                if (t >= 0.0 && t < dist) {
+                    continue;
+                }
+                float area = 4.0f * M_PI * light.radius * light.radius;
+                Spectrum diffuse = Spectrum(light.color) * m->diffuse().evaluate(cosTheta) / M_PI;
+                float factor = area / (dist * dist);
+                s += diffuse * cosLight * factor * medium.throughput / lightPositions.size();
+            }
+        }
+    }
+    if (hit.material == materials.size() - 1) {
+        s.translate(m->convert());
+        return s;
+    }
 	std::vector<Sample> samples = m->sample(hit, medium);
 	for (int i = 0; i < samples.size(); i++) {
 		if (samples[i].pdf > 0 && medium.bounces < GlobalConfig::maxDepth()) {
 			float cosTheta = std::max(0.0f, glm::dot(samples[i].incoming, hit.n));
-			Spectrum newT = medium.throughput * (samples[i].color * (samples[i].delta ? 1.0f : cosTheta / samples[i].pdf));
+            bool volPass = (m->type() == VOLUMETRIC) && samples[i].delta;
+            Spectrum newT = medium.throughput * (volPass ? Spectrum(samples[i].transmission)
+                : (samples[i].color * (samples[i].delta ? 1.0f
+                : cosTheta / samples[i].pdf)));
 
 			// RUSSIAN ROULETTE
 			bool recurse = true;
@@ -144,7 +298,7 @@ Spectrum Scene::pathColor(const Hit& hit, const Medium& medium) {
 			} 
 			if (recurse) s += shade(
 					(Ray){ hit.p + samples[i].incoming*EPSILON, samples[i].incoming },
-					(Medium){ samples[i].ior, medium.bounces + 1, m, newT, samples[i].wavelength, hit.p });
+					(Medium){ samples[i].ior, medium.bounces + 1, volPass ? medium.material : m, newT, samples[i].wavelength, hit.p }, recur + 1);
 		}
 	}
 
@@ -158,14 +312,14 @@ DirectLightData SceneUtils::directLight(const Light& light, const Hit& hit, cons
     DirectLightData dld{};
     dld.color = Spectrum(light.color);
     glm::vec3 ld = glm::vec3(0.0f);
-    if (light.direction.length() == 0.0f) { // point light
-        dld.d2l = glm::normalize(hit.p - light.position);
-        ERROR("Not implemented yet!");
+    if (glm::length(light.direction) == 0.0f) { // point light
+        dld.d2l = glm::normalize(light.position - hit.p);
+        ld = dld.d2l;
     } else if (light.penumbra == 0 && light.angle == 0) { // directional light
-        dld.d2l = light.direction;
-        ld = light.direction;
+        dld.d2l = glm::normalize(light.direction);
+        ld = dld.d2l;
     } else { // spot light
-        dld.d2l = glm::normalize(hit.p - light.position);
+        dld.d2l = glm::normalize(light.position - hit.p);
         ERROR("Not implemented yet!");
     }
     dld.diffuse = std::max(0.0f, glm::dot(hit.n, ld));

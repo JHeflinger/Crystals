@@ -29,3 +29,11 @@ Material library:
 Set Material:
     - Usage: usemtl <material name>
     - Description: All geometry following this declaration will use the material defined by <material name>
+
+Area Light:
+    - Usage: la <position v> <color wavelength start> <color wavelength end> <f1> <f2> <f3> <f4> <f5> <f6> <function points>
+    - Description: Specifies an area light
+
+Sphere Light:
+    - Usage: lsphere <position v> <color wavelength start> <color wavelength end> <radius> <function points>
+    - Description: Specifies a sphere area light
