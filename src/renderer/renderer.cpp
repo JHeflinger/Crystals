@@ -20,7 +20,7 @@ Image Renderer::render(std::string filepath, size_t w, size_t h) {
     return render(sd, w, h);
 }
 
-Image Renderer::render(Scene scene, size_t w, size_t h) {
+Image Renderer::render(Scene& scene, size_t w, size_t h) {
     Image img{};
     if (!scene.validated) {
         WARN("Unable to render invalid scene");
@@ -36,8 +36,11 @@ Image Renderer::render(Scene scene, size_t w, size_t h) {
     std::vector<std::thread> threads;
     long long start = TIME();
     if (PROGRESS_REPORT) INFO("Generating BVH...");
-    scene.bvh = BVH::create(scene.primitives);
-    scene.bvh2 = BVH::create(scene.lPrimitive);
+    if (!bvh) {
+        scene.bvh = BVH::create(scene.primitives);
+        scene.bvh2 = BVH::create(scene.lPrimitive);
+        bvh = true;
+    }
     if (PROGRESS_REPORT) INFO("Rendering rays...")
     img.prepare = ((float)(TIME() - start) / 1000.0f);
     size_t base = (h*w)/cores;

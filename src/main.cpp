@@ -21,6 +21,15 @@ void rotatescene(Scene& scene, float r) {
 	}
 }
 
+void rotatecamera(Scene& scene, float t) {
+    //float theta = 2.0f * M_PI * (t/300.0f);
+    //double x = 1.0f * std::cos(theta);
+    //double y = 1.0f * std::sin(theta);
+    //scene.camera.look = glm::normalize(glm::vec3(x, 0.0f, y));
+    scene.camera.position += glm::vec3(0.05f, 0, 0);
+    scene.camera.update(scene.camera.width, scene.camera.height);
+}
+
 int main (int argc, char *argv[]) {
 	if (argc != 6) {
         FATAL("Wrong number of input arguments detected - correct format:\n\t  program.exe <input_path> <output_path> <samples> <width> <height>");
@@ -48,7 +57,8 @@ int main (int argc, char *argv[]) {
 		        INFO("Finished rendering image %d in %.3f seconds!", i, image.time);
 		        image.save("videos/raws/i_" + std::to_string(i) + ".png");
             }
-		    rotatescene(scene, glm::radians(1.2f));
+		    //rotatescene(scene, glm::radians(1.2f));
+            rotatecamera(scene, (float)i);
 	    }
     }
     return 0;

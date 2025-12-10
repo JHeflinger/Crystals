@@ -1,0 +1,36 @@
+newmtl rock
+absorb 100 700 1.0 1.0 1.0 1.0 0.9 0.8 0.7
+type lambertian
+
+newmtl fog
+absorb 100 700 0.1
+type volumetric
+
+newmtl crystal_blue
+absorb 400 700 0.875 0.99 0.99 0.98 0.875 0.875
+ior 100 700 1.53 1.52 1.5 1.491 1.475 1.45 1.42 1.41 1.389 1.3504
+transmission 100 700 1.0
+type dielectric
+diffract true
+
+newmtl crystal_purple
+# convert 100 700 520 500 271 357 442 528 614
+diffuse 0 0
+specular 0 0
+ambient 100 700 0
+absorb 100 700 0.55 0.55 0.55 0.68 0.98 0.83
+ior 100 700 2.491 2.375 2.25 2.12 2.01 1.989 1.8504
+shiny 25.0
+type dielectric
+diffract true
+
+newmtl crystal_red
+emission 100 700 0.01
+absorb 400 700 0.875 0.99 0.99 0.98 0.875 0.875
+ior 100 700 1.53 1.52 1.5 1.491 1.475 1.45 1.42 1.41 1.389 1.3504
+transmission 100 700 1.01
+type dielectric
+diffract true
+
+newmtl sun
+emission 100 700 0.01
