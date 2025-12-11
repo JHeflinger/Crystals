@@ -6,7 +6,7 @@
 #include "util/parser.h"
 #include "util/jlm.h"
 
-#define VIDEO true
+#define VIDEO false
 #define VSTART 0
 
 void rotatescene(Scene& scene, float r) {
