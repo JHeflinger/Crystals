@@ -40,7 +40,6 @@ If you'd like an example of rendering using this, use the following command to t
 
 This should render one of the example scenes to something similar to the following output! (noise may vary)
 
-[Diamonds](outputs/example.png)
-```
+![Diamonds](outputs/example.png)
 ```
 
