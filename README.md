@@ -4,6 +4,12 @@
 
 Thanks for your interest in Crystals! This repository is a CPU spectral pathtracer. What does this mean? It means that this program can render scenes using realistic materials with practically no dependencies! Rather than using r, g, and b values to render color, we use the entire spectrum of light, from 100 nm to 700 nm! Because of this, you can get some really nice effects such as fluorescence and dispersion!
 
+
+## Video Demo
+You can view the in-depth explanation of how the Crystals renderer works and the available features in the attached YouTube video:
+
+[![Video Demo](https://img.youtube.com/vi/lgO3lt5_VoU/0.jpg)](https://www.youtube.com/watch?v=lgO3lt5_VoU)
+
 ## Things to note
 
 Below are some things to consider before using this renderer. Happy rendering!
